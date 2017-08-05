@@ -17,7 +17,6 @@ AMyProjectile::AMyProjectile()
 	, Target(nullptr)
 	, ExplosionRadius(1000.f)
 	, ExplosionForce(100000000.f)
-	, kostil(false)
 {
 	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
@@ -37,7 +36,7 @@ AMyProjectile::AMyProjectile()
 	Trace->RemoveSplinePoint(0);
 
 	MovementComponent = CreateDefaultSubobject<UProjectileMovementComponent>(TEXT("MovemetComponent"));
-	MovementComponent->bRotationFollowsVelocity = true;
+	MovementComponent->bRotationFollowsVelocity = false;
 
 	Sound = CreateDefaultSubobject<USoundWave>(TEXT("Sound"));
 
@@ -53,30 +52,24 @@ AMyProjectile::AMyProjectile()
 	InitialLifeSpan = 5.0f;
 }
 
+
+
 // Called when the game starts or when spawned
 void AMyProjectile::BeginPlay()
 {
 	Super::BeginPlay();
 
+	FRotator temp = this->GetActorRotation();
+	temp.Pitch = 0.f;
+	this->SetActorRotation(temp);
 
-	startPosition = SceneComp->GetComponentLocation();
-	startRotation = SceneComp->GetComponentRotation();
+	startPosition = this->GetActorLocation();
+	startRotation = this->GetActorRotation();
 
 
 	Timeline->AddInterpFloat(Curve, InterpFunction, TEXT("FloatValue"));
 	Timeline->SetPlayRate(FirstStepVelocity);
 	Timeline->PlayFromStart();
-
-
-
-	if (Target)
-	{
-		MovementComponent->bIsHomingProjectile = true;
-		MovementComponent->HomingAccelerationMagnitude = 0.f;
-		MovementComponent->HomingTargetComponent = Target->GetRootComponent();
-		decreasingVelocity = SecondStepVelocity;
-	}
-
 
 
 	Scalar = FunctionScale / TraceLength;
@@ -89,7 +82,7 @@ void AMyProjectile::BeginPlay()
 
 	for (int i(0); i < SplinePoints; i++)
 	{
-		Trace->AddSplinePoint(FVector((x / Scalar), 0.f, (z / Scalar)), ESplineCoordinateSpace::World);
+		Trace->AddSplinePoint(startRotation.RotateVector(FVector((x / Scalar), 0.f, (z / Scalar))), ESplineCoordinateSpace::World);
 		x += delta_x;
 		z = SplineFunction(x);
 	}
@@ -107,16 +100,6 @@ void AMyProjectile::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-	if (!kostil&&Target)
-	{
-		MovementComponent->bIsHomingProjectile = true;
-		MovementComponent->HomingAccelerationMagnitude = 0.f;
-		MovementComponent->HomingTargetComponent = Target->GetRootComponent();
-		decreasingVelocity = SecondStepVelocity;
-		kostil = true;
-	}
-
-
 	if (PassedInitialTrace)
 	{
 		if (Target)
@@ -124,13 +107,9 @@ void AMyProjectile::Tick(float DeltaTime)
 			//Some kind of interpolation
 			//It is for smoother targeted flight
 			if (decreasingVelocity > 0)
-				decreasingVelocity -= SecondStepVelocity / 2 * DeltaTime;
+				decreasingVelocity -= SecondStepVelocity * DeltaTime;
 			MovementComponent->Velocity = startRotation.RotateVector(FVector(decreasingVelocity, 0.f, 0.f));
 
-			//To rotate projectile towards target
-			ToTargetRotation = FRotationMatrix::MakeFromX(Collision->GetComponentLocation() - Target->GetActorLocation()).Rotator();
-
-			this->SetActorRotation(ToTargetRotation);
 
 			MovementComponent->HomingAccelerationMagnitude = SecondStepVelocity * 100;
 		}
@@ -181,25 +160,29 @@ void AMyProjectile::SetTarget(AActor *target)
 		FVector TargetPosition(Target->GetActorLocation());
 
 		TraceLength = FVector::DistXY(MyPosition, TargetPosition) / 10;
+
+		MovementComponent->bIsHomingProjectile = true;
+		MovementComponent->HomingAccelerationMagnitude = 0.f;
+		MovementComponent->HomingTargetComponent = Target->GetRootComponent();
+		decreasingVelocity = SecondStepVelocity;
 	}
 }
 
 void AMyProjectile::TimelineFloatReturn(float val)
 {
-	//Dunno why, but looks very bugged to me
-
 	//I took local position and rotation at spline by time
-	FVector vector = Trace->GetLocationAtTime(val, ESplineCoordinateSpace::Local);
+	FVector vector = Trace->GetLocationAtTime(val, ESplineCoordinateSpace::World);
 	FRotator rotator = Trace->GetRotationAtTime(val, ESplineCoordinateSpace::Local);
 
 	//And set it to my projectile lile offset
-	SceneComp->SetWorldLocation(startRotation.RotateVector(vector + startPosition));
-	SceneComp->SetWorldRotation(startRotation);
+	SceneComp->SetWorldLocation(vector+FVector(10.f,10.f,0));
+	SceneComp->SetWorldRotation(rotator);
 
 	//If we went through spline
 	if (1 == val)
 	{
 		PassedInitialTrace = true;
 		Trace->DestroyComponent();
+		MovementComponent->bRotationFollowsVelocity = true;
 	}
 }
