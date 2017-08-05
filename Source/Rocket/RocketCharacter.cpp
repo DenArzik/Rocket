@@ -10,10 +10,12 @@
 #include "GameFramework/InputSettings.h"
 #include "Kismet/HeadMountedDisplayFunctionLibrary.h"
 #include "Kismet/GameplayStatics.h"
+#include "Kismet/KismetMathLibrary.h"
 #include "MyProjectile.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Runtime/Engine/Classes/Kismet/KismetMathLibrary.h"
 #include "MotionControllerComponent.h"
+#include "Components/ArrowComponent.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogFPChar, Warning, All);
 
@@ -84,7 +86,7 @@ ARocketCharacter::ARocketCharacter()
 	VR_MuzzleLocation->SetRelativeRotation(FRotator(0.0f, 90.0f, 0.0f));		// Counteract the rotation of the VR gun model.
 
 	// Uncomment the following line to turn motion controllers on by default:
-	//bUsingMotionControllers = true;
+	//bUsingMotionControllers = true
 
 	CapturedTarget = nullptr;
 
@@ -147,8 +149,7 @@ void ARocketCharacter::SetupPlayerInputComponent(class UInputComponent* PlayerIn
 
 void ARocketCharacter::OnFire()
 {
-	//static ConstructorHelpers::FClassFinder<AMyProjectile> ProjectileClassFinder(TEXT("/Game/FirstPersonCPP/Blueprints/MyProjectileBP"));
-	//ProjectileClass = ProjectileClassFinder.Class;
+	
 	// try and fire a projectile
 	if (ProjectileClass != NULL)
 	{
@@ -163,9 +164,11 @@ void ARocketCharacter::OnFire()
 			}
 			else
 			{
-				const FRotator SpawnRotation = GetControlRotation();
+				
+				FRotator SpawnRotation = this->GetActorRotation();
+				SpawnRotation.Pitch = 0.f;
 				// MuzzleOffset is in camera space, so transform it to world space before offsetting from the character location to find the final muzzle position
-				const FVector SpawnLocation = ((FP_MuzzleLocation != nullptr) ? FP_MuzzleLocation->GetComponentLocation() : GetActorLocation()) + SpawnRotation.RotateVector(GunOffset);
+				const FVector SpawnLocation = this->GetActorLocation();
 
 				//Set Spawn Collision Handling Override
 				FActorSpawnParameters ActorSpawnParams;
@@ -174,11 +177,21 @@ void ARocketCharacter::OnFire()
 				for (int i(0); i < 5; i++)
 				{
 					FVector OffsetLocation = SpawnLocation;
-					OffsetLocation.Y += SpawnLocation.Y*sin(i*72*PI/180);
-					OffsetLocation.Z += SpawnLocation.Z*cos(i * 72 * PI / 180);
+					FVector TempVector;
+
+					TempVector.Y = sin(i * 72 * PI / 180)*100;
+					TempVector.Z = cos(i * 72 * PI / 180)*100;
+
+					OffsetLocation += SpawnRotation.RotateVector(TempVector);
+
+					OffsetLocation = (SpawnRotation).RotateVector(OffsetLocation);
+
+					OffsetLocation = (-SpawnRotation).RotateVector(OffsetLocation);
+
+					OffsetLocation += (SpawnRotation).RotateVector(FVector(200.f, 0.f, 50.f));
+
 					// spawn the projectile at the muzzle
-					AMyProjectile *proj = World->SpawnActor<AMyProjectile>(ProjectileClass, OffsetLocation, SpawnRotation, ActorSpawnParams);
-					proj->SetTarget(CapturedTarget);
+					World->SpawnActor<AMyProjectile>(ProjectileClass, OffsetLocation, SpawnRotation, ActorSpawnParams)->SetTarget(CapturedTarget);
 				}
 				
 			}
@@ -329,7 +342,7 @@ void ARocketCharacter::TryToCaptureTarget()
 
 	FVector Start = FirstPersonCameraComponent->GetComponentLocation();
 	FVector fvector = UKismetMathLibrary::GetForwardVector(FirstPersonCameraComponent->GetComponentRotation());
-	FVector End = fvector * 10000 + Start;
+	FVector End = fvector * 30000 + Start;
 	//call GetWorld() from within an actor extending class
 	if (GetWorld()->LineTraceSingleByChannel(
 		RV_Hit,        //result
