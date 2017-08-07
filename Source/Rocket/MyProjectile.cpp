@@ -10,7 +10,7 @@
 AMyProjectile::AMyProjectile()
 	:FunctionScale(3.f)
 	, FirstStepVelocity(0.5f)
-	, SecondStepVelocity(5000.f)
+	, SecondStepVelocity(7000.f)
 	, SplinePoints(5)
 	, TraceLength(1000.f)
 	, PassedInitialTrace(false)
@@ -107,7 +107,7 @@ void AMyProjectile::Tick(float DeltaTime)
 			//Some kind of interpolation
 			//It is for smoother targeted flight
 			if (decreasingVelocity > 0)
-				decreasingVelocity -= SecondStepVelocity * DeltaTime*5;
+				decreasingVelocity -= SecondStepVelocity * DeltaTime*7;
 			MovementComponent->Velocity = startRotation.RotateVector(FVector(decreasingVelocity, 0.f, 0.f));
 
 
