@@ -107,7 +107,7 @@ void AMyProjectile::Tick(float DeltaTime)
 			//Some kind of interpolation
 			//It is for smoother targeted flight
 			if (decreasingVelocity > 0)
-				decreasingVelocity -= SecondStepVelocity * DeltaTime;
+				decreasingVelocity -= SecondStepVelocity * DeltaTime*5;
 			MovementComponent->Velocity = startRotation.RotateVector(FVector(decreasingVelocity, 0.f, 0.f));
 
 
